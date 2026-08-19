@@ -1,1 +1,116 @@
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Instrument Sans", sans-serif;
+
+  --color-paper: #f2f3ee;
+  --color-card: #fcfcfa;
+  --color-ink: #1c2521;
+  --color-inksoft: #5c675f;
+  --color-inkfaint: #8b958d;
+  --color-line: #e2e5dc;
+  --color-linesoft: #ebece5;
+
+  --color-pine: #10231b;
+  --color-pine2: #1a3529;
+  --color-pine3: #24473a;
+  --color-mint: #69c3a4;
+
+  --color-moss: #157f63;
+  --color-mossdark: #0f6a52;
+  --color-mosssoft: #e0efe8;
+
+  --color-amber: #c07a17;
+  --color-ambersoft: #f8ecd6;
+  --color-danger: #bb4636;
+  --color-dangersoft: #f7e3df;
+  --color-steel: #3a678f;
+  --color-steelsoft: #e3ebf3;
+  --color-plum: #6e4b7e;
+  --color-plumsoft: #eee5f2;
+  --color-slatey: #55605a;
+  --color-slatesoft: #e7e9e4;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv05", "ss01";
+}
+
+.font-display { font-family: var(--font-display); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---------- scrollbars ---------- */
+* { scrollbar-width: thin; scrollbar-color: #c4cabd transparent; }
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-thumb { background: #c4cabd; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+.dark-scroll { scrollbar-color: #2c4a3d transparent; }
+.dark-scroll::-webkit-scrollbar-thumb { background: #2c4a3d; }
+
+/* ---------- keyframes ---------- */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes slideLeft { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+@keyframes pulseDot { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.7); opacity: .45; } }
+@keyframes growBar { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes drawIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.anim-fadeUp { animation: fadeUp .45s cubic-bezier(.22,.9,.3,1) both; }
+.anim-fadeIn { animation: fadeIn .25s ease both; }
+.anim-scaleIn { animation: scaleIn .3s cubic-bezier(.22,.9,.3,1) both; }
+.anim-slideLeft { animation: slideLeft .35s cubic-bezier(.22,.9,.3,1) both; }
+.anim-toast { animation: toastIn .32s cubic-bezier(.22,.9,.3,1) both; }
+.anim-drawIn { animation: drawIn .3s ease both; }
+.anim-bar { transform-origin: bottom; animation: growBar .6s cubic-bezier(.22,.9,.3,1) both; }
+
+.stagger > * { animation: fadeUp .45s cubic-bezier(.22,.9,.3,1) both; }
+.stagger > *:nth-child(1) { animation-delay: .02s; }
+.stagger > *:nth-child(2) { animation-delay: .07s; }
+.stagger > *:nth-child(3) { animation-delay: .12s; }
+.stagger > *:nth-child(4) { animation-delay: .17s; }
+.stagger > *:nth-child(5) { animation-delay: .22s; }
+.stagger > *:nth-child(6) { animation-delay: .27s; }
+.stagger > *:nth-child(7) { animation-delay: .32s; }
+.stagger > *:nth-child(8) { animation-delay: .37s; }
+
+.pulse-dot::after {
+  content: ""; position: absolute; inset: 0; border-radius: 9999px;
+  background: currentColor; animation: pulseDot 1.8s ease-in-out infinite;
+}
+
+/* ---------- patterns ---------- */
+.hatch {
+  background-image: repeating-linear-gradient(
+    -45deg, transparent 0 5px, rgba(28,37,33,.10) 5px 7px
+  );
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #e9ebe4 25%, #f4f5f0 50%, #e9ebe4 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.3s infinite linear;
+}
+
+/* ---------- forms ---------- */
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+
+.focusable:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--color-moss);
+  outline-offset: 1px;
+}
+
+/* calendar hour lines */
+.hourline { border-top: 1px solid var(--color-linesoft, #ebece5); }
+.hourline-strong { border-top: 1px solid #e2e5dc; }
