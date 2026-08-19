@@ -1,5 +1,33 @@
+# Dependências
 node_modules/
-.next/
+
+# Build
 dist/
-build/
+dist-ssr/
+*.local
+
+# Variáveis de ambiente (NUNCA subir segredos — use .env.example como modelo)
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel
+
+# Logs
+logs/
 *.log
+npm-debug.log*
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.next/
+build/
