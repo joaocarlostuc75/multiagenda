@@ -1,0 +1,351 @@
+// Agendou — schema multi-tenant (SPEC §1.4)
+// Banco: Neon Postgres (serverless). Deploy: `npx prisma migrate deploy`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ------------------------------------------------------------- persistência demo
+model TenantStore {
+  id        String   @id
+  data      Json
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("tenant_store")
+}
+
+// --------------------------------------------------------------------- entidades
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique // subdomínio: slug.agendou.app
+  category  String   @default("")
+  phone     String   @default("")
+  address   String   @default("")
+  timezone  String   @default("America/Sao_Paulo")
+  accent    String   @default("#157f63")
+  logoUrl   String?  @map("logo_url")
+  settings  Json     @default("{}") // templates WhatsApp, lembretes, aparência
+  status    String   @default("active")
+  plan      String   @default("free")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  users           User[]
+  professionals   Professional[]
+  categories      ServiceCategory[]
+  services        Service[]
+  products        Product[]
+  clients         Client[]
+  appointments    Appointment[]
+  blockedTimes    BlockedTime[]
+  paymentMethods  PaymentMethod[]
+  payments        PaymentRecord[]
+  media           Media[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@map("tenants")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  tenantId       String       @map("tenant_id")
+  name           String
+  email          String
+  phone          String       @default("")
+  passwordHash   String       @map("password_hash")
+  role           UserRole     @default(receptionist)
+  professionalId String?      @map("professional_id")
+  active         Boolean      @default(true)
+  avatarUrl      String?      @map("avatar_url")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional Professional? @relation(fields: [professionalId], references: [id], onDelete: SetNull)
+  auditLogs    AuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+enum UserRole {
+  owner
+  manager
+  receptionist
+  professional
+}
+
+model Professional {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  name            String
+  bio             String    @default("")
+  avatarUrl       String?   @map("avatar_url")
+  occupation      String    @default("")
+  color           String    @default("#157f63")
+  active          Boolean   @default(true)
+  commissionPct   Int       @default(0) @map("commission_percent")
+  weeklyHours     Json      @default("{}") @map("weekly_hours") // {0..6: DayHours}
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users        User[]
+  workingHours WorkingHours[]
+  appointments Appointment[]
+  blockedTimes BlockedTime[]
+  services     ServiceProfessional[]
+
+  @@index([tenantId])
+  @@map("professionals")
+}
+
+model WorkingHours {
+  id             String  @id @default(cuid())
+  tenantId       String  @map("tenant_id")
+  professionalId String  @map("professional_id")
+  dayOfWeek      Int     @map("day_of_week") // 0 = domingo
+  startTime      String  @map("start_time")
+  endTime        String  @map("end_time")
+  breakStart     String? @map("break_start")
+  breakEnd       String? @map("break_end")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, professionalId, dayOfWeek])
+  @@index([tenantId])
+  @@map("working_hours")
+}
+
+model ServiceCategory {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  name        String
+  description String    @default("")
+  imageUrl    String?   @map("image_url")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  services Service[]
+
+  @@index([tenantId])
+  @@map("service_categories")
+}
+
+model Service {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  categoryId     String   @map("category_id")
+  name           String
+  description    String   @default("")
+  durationMin    Int      @map("duration_min")
+  price          Decimal  @db.Decimal(10, 2)
+  color          String   @default("#157f63")
+  imageUrls      String[] @map("image_urls")
+  active         Boolean  @default(true)
+  bufferBeforeMin Int     @default(0) @map("buffer_before_min")
+  bufferAfterMin  Int     @default(0) @map("buffer_after_min")
+  maxPerDay       Int     @default(0) @map("max_per_day") // 0 = ilimitado
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category     ServiceCategory       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  professionals ServiceProfessional[]
+  appointments Appointment[]
+  blockedTimes BlockedTime[]
+
+  @@index([tenantId])
+  @@index([tenantId, categoryId])
+  @@map("services")
+}
+
+model ServiceProfessional {
+  serviceId      String @map("service_id")
+  professionalId String @map("professional_id")
+
+  service      Service      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@id([serviceId, professionalId])
+  @@map("service_professionals")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String   @default("")
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  imageUrls   String[] @map("image_urls")
+  active      Boolean  @default(true)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("products")
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  email     String   @default("")
+  phone     String
+  birthdate DateTime? @map("birthdate") @db.Date
+  notes     String   @default("")
+  tags      String[]
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([tenantId])
+  @@index([tenantId, phone])
+  @@map("clients")
+}
+
+enum AppointmentStatus {
+  pendente
+  confirmado
+  concluido
+  cancelado
+  no_show
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  tenantId        String            @map("tenant_id")
+  clientId        String            @map("client_id")
+  professionalId  String            @map("professional_id")
+  serviceId       String            @map("service_id")
+  start           DateTime          @map("start_time") @db.Timestamptz() // sempre em UTC; exibir no timezone do tenant
+  end             DateTime          @map("end_time") @db.Timestamptz()
+  status          AppointmentStatus @default(pendente)
+  price           Decimal           @db.Decimal(10, 2)
+  paymentMethodId String?           @map("payment_method_id")
+  notes           String            @default("")
+  origin          String            @default("interno") // interno | online
+  location        String            @default("")
+  externalRef     String?           @map("external_ref")
+  createdBy       String?           @map("created_by")
+  updatedBy       String?           @map("updated_by")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz()
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client       Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  professional Professional   @relation(fields: [professionalId], references: [id], onDelete: Restrict)
+  service      Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  payment      PaymentRecord?
+
+  @@index([tenantId, start])
+  @@index([tenantId, professionalId, start])
+  @@map("appointments")
+}
+
+model BlockedTime {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  professionalId String?  @map("professional_id") // null = estabelecimento todo
+  serviceId      String?  @map("service_id")
+  start          DateTime @map("start_time") @db.Timestamptz()
+  end            DateTime @map("end_time") @db.Timestamptz()
+  reason         String   @default("")
+  recurrenceRule String?  @map("recurrence_rule") // RRULE (iCal): FREQ=DAILY|WEEKLY|MONTHLY
+  groupId        String?  @map("group_id")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional Professional? @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  service      Service?      @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, start])
+  @@map("blocked_times")
+}
+
+model PaymentMethod {
+  id       String  @id @default(cuid())
+  tenantId String  @map("tenant_id")
+  name     String
+  type     String // dinheiro | pix | cartao | transferencia
+  active   Boolean @default(true)
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments PaymentRecord[]
+
+  @@index([tenantId])
+  @@map("payment_methods")
+}
+
+model PaymentRecord {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  appointmentId String    @unique @map("appointment_id")
+  methodId      String    @map("method_id")
+  amount        Decimal   @db.Decimal(10, 2)
+  status        String    @default("pago") // pago | pendente
+  paidAt        DateTime? @map("paid_at") @db.Timestamptz()
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointment Appointment   @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  method      PaymentMethod @relation(fields: [methodId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, paidAt])
+  @@map("payment_records")
+}
+
+model Media {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  entityType String   @map("entity_type") // tenant | professional | service | product
+  entityId   String   @map("entity_id")
+  url        String
+  thumbUrl   String?  @map("thumb_url")
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entityType, entityId])
+  @@map("media")
+}
+
+model Notification {
+  id            String    @id @default(cuid())
+  tenantId      String    @map("tenant_id")
+  appointmentId String?   @map("appointment_id")
+  type          String // confirmacao | lembrete24 | lembrete2 | cancelamento | novo_online
+  channel       String   @default("whatsapp")
+  status        String   @default("pendente") // pendente | enviada | falhou
+  payload       Json     @default("{}")
+  sentAt        DateTime? @map("sent_at") @db.Timestamptz()
+  error         String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sentAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  userId      String?  @map("user_id")
+  action      String // create | update | delete | login | export
+  entity      String
+  entityId    String   @map("entity_id")
+  changes     Json     @default("{}") @map("changes_json")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}

@@ -5,7 +5,7 @@ import { ACCESS, ROLE_LABEL } from '../types';
 import { useApp } from '../store';
 import { TENANT_LIST } from '../data/seed';
 import { fmtShortDow, pad2 } from '../lib/schedule';
-import { Avatar, Badge, Icon, useToast } from './ui';
+import { Avatar, Icon, useToast } from './ui';
 
 const NAV: { group: string; items: { id: PageId; label: string; icon: string }[] }[] = [
   { group: 'Operação', items: [
@@ -29,7 +29,7 @@ const NAV: { group: string; items: { id: PageId; label: string; icon: string }[]
 const pageLabel = (id: PageId) => NAV.flatMap((g) => g.items).find((i) => i.id === id)?.label ?? '';
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { tenantId, setTenantId, data, role, setRole, page, nav, currentUser, setPortalOpen } = useApp();
+  const { tenantId, setTenantId, data, role, setRole, page, nav, currentUser, setPortalOpen, cloud, retryCloud } = useApp();
   const { push } = useToast();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
@@ -157,7 +157,25 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <Badge tone="pine" className="hidden md:inline-flex"><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint pulse-dot" />demo ao vivo</Badge>
+            {/* status da persistência (Vercel + Neon) */}
+            <button
+              onClick={() => {
+                if (cloud === 'error') { retryCloud(); push('Tentando reconectar ao Neon…', 'info'); return; }
+                if (cloud === 'off') push('Modo local: sem backend detectado. Na Vercel com DATABASE_URL, os dados persistem no Neon — veja o README.', 'info');
+                if (cloud === 'synced') push('Dados sincronizados com o Neon (Postgres serverless) via Vercel Functions.', 'info');
+                if (cloud === 'saving') push('Enviando alterações para o Neon…', 'info');
+              }}
+              title="Status da sincronização Vercel + Neon"
+              className="hidden items-center gap-2 rounded-full border border-line bg-card py-1.5 pl-2.5 pr-3 text-[12px] font-bold text-inksoft transition-all hover:border-inkfaint hover:text-ink sm:inline-flex">
+              <span className={`relative inline-flex h-2 w-2 rounded-full ${
+                cloud === 'synced' ? 'bg-moss' : cloud === 'saving' ? 'bg-amber pulse-dot' : cloud === 'error' ? 'bg-danger' : cloud === 'checking' ? 'bg-steel pulse-dot' : 'bg-inkfaint'
+              }`} />
+              {cloud === 'checking' && 'verificando nuvem…'}
+              {cloud === 'off' && 'armazenamento local'}
+              {cloud === 'saving' && 'salvando no Neon…'}
+              {cloud === 'synced' && <span className="text-mossdark">Neon · sincronizado</span>}
+              {cloud === 'error' && <span className="text-danger">falha de sync — clique p/ retry</span>}
+            </button>
 
             {/* portal do cliente */}
             <button onClick={() => setPortalOpen(true)}
@@ -187,12 +205,9 @@ export function Shell({ children }: { children: ReactNode }) {
                       <button key={t.id}
                         onClick={() => { setTenantId(t.id); setSwitchOpen(false); push(`Dados isolados de “${t.name}” carregados.`, 'info'); }}
                         className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${td ? 'bg-mosssoft' : 'hover:bg-paper'}`}>
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg font-display text-[14px] font-bold text-white"
-                          style={{ background: td ? undefined : '#8b958d' }}
-                          data-accent={t.id}>
-                          <span className="flex h-8 w-8 items-center justify-center rounded-lg font-display text-[14px] font-bold text-white" style={{ background: t.id === 'aurora' ? '#a34a6d' : t.id === 'navalha' ? '#b07c22' : '#3a6ea5' }}>
-                            {t.name[0]}
-                          </span>
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-display text-[14px] font-bold text-white"
+                          style={{ background: t.id === 'aurora' ? '#a34a6d' : t.id === 'navalha' ? '#b07c22' : '#3a6ea5' }}>
+                          {t.name[0]}
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[13px] font-bold text-ink">{t.name}</span>
