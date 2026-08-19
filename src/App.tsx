@@ -2,7 +2,9 @@ import { useEffect } from 'react';
 import { StoreProvider, useApp } from './store';
 import { ToastProvider } from './components/ui';
 import { Shell } from './components/Shell';
+import { Outbox } from './components/Outbox';
 import { ACCESS } from './types';
+import { AuthPage } from './pages/Auth';
 import { DashboardPage } from './pages/Dashboard';
 import { AgendaPage } from './pages/Agenda';
 import { ServicesPage } from './pages/Services';
@@ -16,14 +18,11 @@ import { SettingsPage } from './pages/Settings';
 import { PortalPage } from './pages/Portal';
 
 function Router() {
-  const { page, role, nav, portalOpen, tenantId } = useApp();
+  const { page, role, nav, portalOpen } = useApp();
 
   useEffect(() => {
     if (!ACCESS[role].includes(page)) nav('dashboard');
   }, [role, page, nav]);
-
-  // reset de páginas sensíveis ao trocar de tenant
-  useEffect(() => { /* página já é reiniciada via key no Shell */ }, [tenantId]);
 
   return (
     <>
@@ -44,11 +43,18 @@ function Router() {
   );
 }
 
+function Gate() {
+  const { session } = useApp();
+  if (!session) return <AuthPage />;
+  return <Router />;
+}
+
 export default function App() {
   return (
     <StoreProvider>
       <ToastProvider>
-        <Router />
+        <Gate />
+        <Outbox />
       </ToastProvider>
     </StoreProvider>
   );

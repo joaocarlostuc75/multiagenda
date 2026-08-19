@@ -14,11 +14,25 @@ Vercel Functions (`/api`) no backend e **Neon (Postgres serverless)** como banco
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173 — modo "armazenamento local"
+npm run dev          # http://localhost:5173
 ```
 
-Sem backend configurado, o app funciona 100% offline: os dados ficam no navegador e o
+O sistema **nasce vazio — não há dados fictícios**. Na primeira execução você vê a tela
+de autenticação: crie um estabelecimento (onboarding) para gerar seu tenant isolado e a
+conta de proprietário. Sem backend configurado, os dados ficam no navegador e o
 indicador na topbar mostra **"armazenamento local"**.
+
+### Autenticação, RBAC e isolamento
+
+- **Login com senha** (hash bcrypt — nunca texto puro) e **recuperação de senha** via
+  código com expiração de 24h.
+- **RBAC real por conta**: `owner`, `manager`, `receptionist`, `professional`. O papel
+  vem da conta logada (não há "simulador"); a sidebar e as ações respeitam o mapa de
+  acesso. O proprietário convida a equipe, que ativa a conta com um código de convite.
+- **Isolamento total**: um login resolve **um único tenant**; todo dado é lido/escrito
+  sob `tenant_id` e não há UI para cruzar estabelecimentos.
+- Como não há servidor de e-mail neste demo, convites e códigos de recuperação chegam na
+  **caixa de e-mails de demonstração** (ícone de envelope, canto inferior direito).
 
 ## 2. Criar o banco no Neon
 
@@ -129,11 +143,12 @@ functions em `api/` (256 MB · 10 s).
 - **Indicador ao vivo** na topbar: `verificando nuvem… → salvando no Neon… → Neon ·
   sincronizado` (ou `armazenamento local` / retry em caso de falha).
 
-### Seed
+### Seed / bootstrap
 
-Não há passo manual de seed: no primeiro acesso com Neon ativo, o app sobe o estado
-demo determinístico (3 tenants, ~15 dias de agenda relativa à data atual) para a nuvem.
-Para um tenant novo em produção, o onboarding criaria a linha via `POST /tenants`.
+**Não existe seed com dados fictícios.** Cada tenant é criado pelo onboarding (tela de
+cadastro), que gera uma estrutura vazia (só as formas de pagamento padrão) e a conta do
+proprietário. Com o Neon ativo, o primeiro `PUT /api/tenants/:id` persiste esse tenant;
+os demais dispositivos o recuperam via `GET` no login.
 
 ## 5. Estrutura
 
@@ -145,10 +160,13 @@ prisma/
   schema.prisma          modelo completo da SPEC (15 entidades)
   migrations/0001_init/  DDL + índices + políticas RLS
 src/
-  store.tsx              estado global + lifecycle de sync nuvem/local
+  store.tsx              sessão, auth (login/registro/recuperação/convites) + sync
+  lib/auth.ts            hash bcrypt, tokens e validações
   lib/cloudSync.ts       adaptador fetch → /api (fallback silencioso)
   lib/schedule.ts        motor de horários, disponibilidade e conflitos
-  data/seed.ts           seed determinístico por tenant
+  data/seed.ts           fábrica de tenant vazio (sem dados fictícios)
+  components/Outbox.tsx  caixa de e-mails demo (convites + recuperação)
+  pages/Auth.tsx         login, onboarding do estabelecimento, recuperar senha
   pages/                 Dashboard, Agenda, Horas, Bloqueios, CRUDs, Portal…
 vercel.json              rewrite SPA + config das functions
 ```
