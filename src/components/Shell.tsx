@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { PageId, Role } from '../types';
+import type { PageId } from '../types';
 import { ACCESS, ROLE_LABEL } from '../types';
 import { useApp } from '../store';
-import { TENANT_LIST } from '../data/seed';
 import { fmtShortDow, pad2 } from '../lib/schedule';
 import { Avatar, Icon, useToast } from './ui';
 
@@ -29,11 +28,11 @@ const NAV: { group: string; items: { id: PageId; label: string; icon: string }[]
 const pageLabel = (id: PageId) => NAV.flatMap((g) => g.items).find((i) => i.id === id)?.label ?? '';
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { tenantId, setTenantId, data, role, setRole, page, nav, currentUser, setPortalOpen, cloud, retryCloud } = useApp();
+  const { data, role, page, nav, currentUser, setPortalOpen, logout, cloud, retryCloud } = useApp();
   const { push } = useToast();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [switchOpen, setSwitchOpen] = useState(false);
-  const switchRef = useRef<HTMLDivElement>(null);
+  const [acctOpen, setAcctOpen] = useState(false);
+  const acctRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -43,18 +42,17 @@ export function Shell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (switchRef.current && !switchRef.current.contains(e.target as Node)) setSwitchOpen(false);
+      if (acctRef.current && !acctRef.current.contains(e.target as Node)) setAcctOpen(false);
     };
     window.addEventListener('mousedown', h);
     return () => window.removeEventListener('mousedown', h);
   }, []);
 
   const allowed = ACCESS[role];
-  const tenantMeta = TENANT_LIST.find((t) => t.id === tenantId);
+  const canSettings = allowed.includes('settings');
 
   const sidebar = (
     <div className="flex h-full w-[248px] flex-col bg-pine text-[#c8d6ce]">
-      {/* marca */}
       <div className="flex items-center gap-2.5 px-5 pb-4 pt-5">
         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-pine3 text-mint">
           <Icon name="calendar" size={20} />
@@ -65,14 +63,16 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      {/* tenant ativo */}
       <div className="mx-3 mb-4 rounded-xl border border-pine3 bg-pine2/60 px-3 py-2.5">
-        <p className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-mint/60">Estabelecimento ativo</p>
+        <p className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-mint/60">Seu estabelecimento</p>
         <div className="mt-1.5 flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg font-display text-[13px] font-bold text-white"
-            style={{ background: data.settings.accent }}>
-            {data.settings.name[0]}
-          </span>
+          {data.settings.logoUrl ? (
+            <img src={data.settings.logoUrl} alt="" className="h-7 w-7 rounded-lg object-cover" />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg font-display text-[13px] font-bold text-white" style={{ background: data.settings.accent }}>
+              {data.settings.name[0] ?? '•'}
+            </span>
+          )}
           <div className="min-w-0">
             <p className="truncate text-[13px] font-bold text-white">{data.settings.name}</p>
             <p className="truncate text-[11px] text-[#9db3a7]">{data.settings.slug}.agendou.app</p>
@@ -90,7 +90,7 @@ export function Shell({ children }: { children: ReactNode }) {
               return (
                 <button key={item.id}
                   onClick={() => {
-                    if (locked) { push(`“${item.label}” é restrito — troque o papel no topo para Proprietário(a).`, 'err'); return; }
+                    if (locked) { push(`“${item.label}” não está liberado para o seu papel (${ROLE_LABEL[role]}).`, 'err'); return; }
                     nav(item.id); setMobileOpen(false);
                   }}
                   className={`group mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] font-semibold transition-all duration-150 ${
@@ -98,9 +98,6 @@ export function Shell({ children }: { children: ReactNode }) {
                   <Icon name={item.icon} size={16} className={active ? 'text-mint' : ''} />
                   <span className="flex-1 truncate">{item.label}</span>
                   {locked && <Icon name="lock" size={13} className="text-[#5f7a6d]" />}
-                  {item.id === 'hours' && !locked && (
-                    <span className={`rounded px-1 py-px text-[9.5px] font-bold uppercase tracking-wide ${active ? 'bg-white/20 text-white' : 'bg-moss/20 text-mint'}`}>editável</span>
-                  )}
                 </button>
               );
             })}
@@ -108,23 +105,17 @@ export function Shell({ children }: { children: ReactNode }) {
         ))}
       </nav>
 
-      {/* usuário + papel */}
       <div className="border-t border-pine3 p-3">
-        <label className="mb-2 block">
-          <span className="mb-1 block text-[10.5px] font-bold uppercase tracking-[0.12em] text-mint/60">Simular nível de acesso</span>
-          <select value={role} onChange={(e) => setRole(e.target.value as Role)}
-            className="w-full cursor-pointer rounded-lg border border-pine3 bg-pine2 px-2.5 py-2 text-[13px] font-semibold text-white focus:border-moss">
-            {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
-              <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-            ))}
-          </select>
-        </label>
         <div className="flex items-center gap-2.5 rounded-lg bg-pine2/70 px-2.5 py-2">
           <Avatar name={currentUser.name} size={30} color={data.settings.accent} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-[13px] font-bold text-white">{currentUser.name}</p>
             <p className="truncate text-[11px] text-[#9db3a7]">{ROLE_LABEL[role]}</p>
           </div>
+          <button onClick={() => { logout(); }} aria-label="Sair"
+            className="rounded-md p-1.5 text-[#9db3a7] transition-colors hover:bg-pine3 hover:text-white">
+            <Icon name="logout" size={16} />
+          </button>
         </div>
       </div>
     </div>
@@ -132,10 +123,8 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-full">
-      {/* sidebar desktop */}
       <aside className="hidden lg:block">{sidebar}</aside>
 
-      {/* sidebar mobile */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div className="anim-fadeIn absolute inset-0 bg-pine/60" onClick={() => setMobileOpen(false)} />
@@ -144,7 +133,6 @@ export function Shell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* topbar */}
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-paper/85 px-4 py-3 backdrop-blur-sm lg:px-6">
           <button className="rounded-lg border border-line bg-card p-2 text-ink lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Menu">
             <Icon name="menu" size={18} />
@@ -157,11 +145,10 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* status da persistência (Vercel + Neon) */}
             <button
               onClick={() => {
                 if (cloud === 'error') { retryCloud(); push('Tentando reconectar ao Neon…', 'info'); return; }
-                if (cloud === 'off') push('Modo local: sem backend detectado. Na Vercel com DATABASE_URL, os dados persistem no Neon — veja o README.', 'info');
+                if (cloud === 'off') push('Modo local: sem backend detectado. Na Vercel com DATABASE_URL, os dados persistem no Neon.', 'info');
                 if (cloud === 'synced') push('Dados sincronizados com o Neon (Postgres serverless) via Vercel Functions.', 'info');
                 if (cloud === 'saving') push('Enviando alterações para o Neon…', 'info');
               }}
@@ -174,10 +161,9 @@ export function Shell({ children }: { children: ReactNode }) {
               {cloud === 'off' && 'armazenamento local'}
               {cloud === 'saving' && 'salvando no Neon…'}
               {cloud === 'synced' && <span className="text-mossdark">Neon · sincronizado</span>}
-              {cloud === 'error' && <span className="text-danger">falha de sync — clique p/ retry</span>}
+              {cloud === 'error' && <span className="text-danger">falha de sync — retry</span>}
             </button>
 
-            {/* portal do cliente */}
             <button onClick={() => setPortalOpen(true)}
               className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-bold text-white shadow-sm transition-transform duration-150 hover:scale-[1.03] active:scale-[.97]"
               style={{ background: data.settings.accent }}>
@@ -186,40 +172,32 @@ export function Shell({ children }: { children: ReactNode }) {
               <span className="sm:hidden">Portal</span>
             </button>
 
-            {/* seletor de tenant */}
-            <div className="relative" ref={switchRef}>
-              <button onClick={() => setSwitchOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-lg border border-line bg-card px-2.5 py-1.5 transition-colors hover:border-inkfaint">
-                <span className="flex h-6 w-6 items-center justify-center rounded-md font-display text-[12px] font-bold text-white" style={{ background: data.settings.accent }}>
-                  {data.settings.name[0]}
-                </span>
-                <span className="hidden max-w-[110px] truncate text-[13px] font-bold text-ink md:block">{tenantMeta?.name}</span>
-                <Icon name="chevD" size={14} className={`text-inksoft transition-transform ${switchOpen ? 'rotate-180' : ''}`} />
+            {/* menu da conta */}
+            <div className="relative" ref={acctRef}>
+              <button onClick={() => setAcctOpen((v) => !v)}
+                className="flex items-center gap-2 rounded-lg border border-line bg-card px-2 py-1.5 transition-colors hover:border-inkfaint">
+                <Avatar name={currentUser.name} size={26} color={data.settings.accent} />
+                <Icon name="chevD" size={14} className={`text-inksoft transition-transform ${acctOpen ? 'rotate-180' : ''}`} />
               </button>
-              {switchOpen && (
+              {acctOpen && (
                 <div className="anim-scaleIn absolute right-0 top-full z-40 mt-1.5 w-64 rounded-xl border border-line bg-card p-1.5 shadow-xl">
-                  <p className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-bold uppercase tracking-[0.12em] text-inkfaint">Trocar estabelecimento (tenant)</p>
-                  {TENANT_LIST.map((t) => {
-                    const td = t.id === tenantId;
-                    return (
-                      <button key={t.id}
-                        onClick={() => { setTenantId(t.id); setSwitchOpen(false); push(`Dados isolados de “${t.name}” carregados.`, 'info'); }}
-                        className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${td ? 'bg-mosssoft' : 'hover:bg-paper'}`}>
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-display text-[14px] font-bold text-white"
-                          style={{ background: t.id === 'aurora' ? '#a34a6d' : t.id === 'navalha' ? '#b07c22' : '#3a6ea5' }}>
-                          {t.name[0]}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-bold text-ink">{t.name}</span>
-                          <span className="block truncate text-[11px] text-inksoft">{t.category} · {t.id}.agendou.app</span>
-                        </span>
-                        {td && <Icon name="check" size={15} className="text-moss" />}
-                      </button>
-                    );
-                  })}
-                  <p className="mt-1 border-t border-line px-2.5 py-2 text-[11px] leading-relaxed text-inkfaint">
-                    Cada tenant tem dados 100% isolados — agenda, clientes, serviços e configurações próprios.
-                  </p>
+                  <div className="border-b border-line px-2.5 pb-2.5 pt-2">
+                    <p className="truncate text-[13.5px] font-bold text-ink">{currentUser.name}</p>
+                    <p className="truncate text-[11.5px] text-inksoft">{currentUser.email}</p>
+                    <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-mosssoft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-mossdark">
+                      <Icon name="lock" size={11} /> {ROLE_LABEL[role]}
+                    </span>
+                  </div>
+                  {canSettings && (
+                    <button onClick={() => { nav('settings'); setAcctOpen(false); }}
+                      className="mt-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-ink transition-colors hover:bg-paper">
+                      <Icon name="gear" size={15} className="text-inksoft" /> Configurações & minha conta
+                    </button>
+                  )}
+                  <button onClick={() => { setAcctOpen(false); logout(); }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] font-semibold text-danger transition-colors hover:bg-dangersoft">
+                    <Icon name="logout" size={15} /> Sair da conta
+                  </button>
                 </div>
               )}
             </div>
@@ -227,7 +205,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </header>
 
         <main className="min-w-0 flex-1 overflow-y-auto px-4 py-5 lg:px-6">
-          <div key={page + tenantId} className="anim-fadeUp mx-auto max-w-[1240px]">{children}</div>
+          <div key={page + data.settings.slug} className="anim-fadeUp mx-auto max-w-[1240px]">{children}</div>
         </main>
       </div>
     </div>

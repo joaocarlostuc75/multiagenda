@@ -38,8 +38,10 @@ export type User = {
   name: string;
   email: string;
   role: Role;
-  professionalId?: string;
+  /** hash bcrypt — nunca texto puro. Vazio enquanto o convite não é aceito. */
+  passwordHash: string;
   status: 'ativo' | 'convidado';
+  professionalId?: string;
 };
 
 export type Professional = {
@@ -161,7 +163,6 @@ export type TenantData = {
   paymentMethods: PaymentMethod[];
   payments: PaymentRecord[];
   notifications: NotificationEntry[];
-  seededOn: string;
 };
 
 export type PageId =
@@ -181,4 +182,24 @@ export const ACCESS: Record<Role, PageId[]> = {
   manager: ['dashboard', 'agenda', 'blocks', 'services', 'clients', 'professionals', 'hours', 'payments', 'notifications'],
   receptionist: ['dashboard', 'agenda', 'clients', 'services', 'payments'],
   professional: ['dashboard', 'agenda'],
+};
+
+/* ---------- autenticação ---------- */
+
+export type Session = {
+  tenantId: string;
+  userId: string;
+  loggedAt: string;
+};
+
+export type TokenType = 'invite' | 'reset';
+
+export type Token = {
+  id: string;
+  type: TokenType;
+  email: string;
+  tenantId: string;
+  token: string;
+  createdAt: string;
+  expiresAt: string;
 };

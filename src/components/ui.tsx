@@ -49,6 +49,7 @@ const P: Record<string, ReactNode> = {
   send: <><path d="M21.5 2.5L10.8 13.2" /><path d="M21.5 2.5L14.5 21.5l-3.7-8.3-8.3-3.7z" /></>,
   zap: <path d="M13 2.5L4.5 13.5H11L9.5 21.5 19.5 9.5H12.5z" />,
   history: <><path d="M3.5 12a8.5 8.5 0 1 1 2.5 6" /><path d="M3.5 13.5V18H8" /><path d="M12 7.5V12l3 2" /></>,
+  logout: <><path d="M9.5 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.5" /><path d="M16 16.5l4.5-4.5L16 7.5M20.5 12h-11" /></>,
 };
 
 export function Icon({ name, size = 18, className = '' }: { name: string; size?: number; className?: string }) {
