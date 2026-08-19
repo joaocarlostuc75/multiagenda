@@ -45,24 +45,66 @@ npx prisma migrate deploy        # usa DATABASE_URL / DIRECT_URL do .env
 
 ## 3. Deploy na Vercel
 
-### Via GitHub (recomendado)
+### ⚠️ Erro “Deployment Blocked / contributing access” (plano Hobby)
+
+Se o deploy falhar com:
+
+> *The deployment was blocked because the commit author did not have contributing
+> access to the project on Vercel. The Hobby Plan does not support collaboration
+> for private repositories.*
+
+o problema é de **autoria de commit × titularidade do projeto**, não do código.
+Resolva com uma das opções:
+
+**A) Deploy pela CLI (recomendada — ignora autoria de commit)**
+
+A CLI autentica pelo *seu login*, não pelo autor do commit:
+
+```bash
+npm i -g vercel
+vercel login                 # entre com a MESMA conta (GitHub/Google/e-mail)
+vercel link                  # associe a pasta a um projeto novo ou existente
+vercel env add DATABASE_URL  # production → cole a pooled connection do Neon
+vercel env add DIRECT_URL    # direct connection do Neon
+vercel --prod                # publica direto, sem passar pelo Git
+```
+
+Depois do primeiro `--prod`, redeploys são só `vercel --prod` novamente.
+Para reatar o Git *depois*, conecte o repositório em
+**Project → Settings → Git** — os próximos deploys via push passam a funcionar.
+
+**B) Alinhar o autor dos commits à conta Vercel**
+
+O e-mail do autor precisa estar conectado à conta dona do projeto
+(Vercel → Settings → Account → Emails/Git). Verifique e reescreva:
+
+```bash
+git log --format='%an <%ae>' | sort -u                    # veja quem "assina" os commits
+git config user.name  "Seu Nome"
+git config user.email "voce@mesmo-email-da-vercel.com"
+git rebase -i --root --exec "git commit --amend --reset-author --no-edit"
+git push --force-with-lease
+```
+
+**C) Outras saídas rápidas**
+
+- **Tornar o repositório público** no GitHub — o Hobby aceita commits de qualquer
+  autor em repositórios públicos.
+- **Forkar para a sua conta** e importar o fork como dono do projeto.
+- Se o projeto pertence à conta de outra pessoa, o Hobby não permite membros:
+  ou a conta dona faz o redeploy, ou faz-se o upgrade para o Pro.
+
+---
+
+### Via GitHub (quando a autoria está alinhada)
 
 1. Suba o repositório para o GitHub.
-2. Em [vercel.com](https://vercel.com) → **Add New Project** → importe o repositório.
+2. Em [vercel.com](https://vercel.com) → **Add New Project** → importe o repositório
+   com a conta dona do projeto.
 3. Framework detectado: **Vite**. Build: `npm run build` · Output: `dist`.
 4. Em **Settings → Environment Variables**, adicione `DATABASE_URL` e `DIRECT_URL`
    (valores do `.env.example`).
 5. **Deploy**. A cada push, produção atualiza automaticamente.
-
-### Via CLI
-
-```bash
-npm i -g vercel
-vercel link
-vercel env add DATABASE_URL   # cole a pooled connection do Neon
-vercel env add DIRECT_URL
-vercel --prod
-```
 
 O `vercel.json` já configura o rewrite SPA (`/qualquer-rota → index.html`) e as
 functions em `api/` (256 MB · 10 s).
